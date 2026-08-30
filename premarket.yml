@@ -206,14 +206,17 @@ jobs:
               missing = [t for t in tickers if t not in out]
               if missing:
                   print(f"개별 재시도 {len(missing)}종목: {', '.join(missing[:10])}"
-                        f"{' 외' if len(missing) > 10 else ''}", file=sys.stderr)
+                        f"{' 외' if len(missing) > 10 else ''}")
                   for t in missing:
-                      for _ in range(2):
+                      for attempt in range(3):
                           df = fetch_one(t, period)
                           if df is not None:
                               out[t] = df
+                              print(f"  {t} 회수 성공 ({attempt + 1}회차)")
                               break
-                          time.sleep(1.5)
+                          time.sleep(2 * (attempt + 1))   # 2초 → 4초 → 6초
+                      else:
+                          print(f"  {t} 회수 실패 (3회 시도)")
 
               return out
 
@@ -481,8 +484,14 @@ jobs:
                   "errors": [],
               }
 
-              # --- 미국 섹터 ETF
-              etf_hist = fetch_history(list(SECTOR_ETFS))
+              # 시간대 캐시(sqlite)를 단일 스레드로 미리 한 번 채워둔다.
+              # 여러 스레드가 빈 캐시에 동시에 쓰려 하면 'database is locked'가 나면서
+              # 종목이 통째로 누락된다. 미리 만들어두면 이후 병렬 조회가 읽기만 한다.
+              warm = fetch_one("SPY", period="5d")
+              print(f"시간대 캐시 예열: {'성공' if warm is not None else '실패(계속 진행)'}")
+
+              # --- 미국 섹터 ETF (11개뿐이라 순차 조회해도 느리지 않다)
+              etf_hist = fetch_history(list(SECTOR_ETFS), threads=False)
               sectors = []
               for tkr, kor in SECTOR_ETFS.items():
                   if tkr not in etf_hist:
