@@ -1,13 +1,26 @@
 {
-  "generated_at_kst": "2026-08-30 10:28:39",
+  "generated_at_kst": "2026-08-30 10:32:35",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [
-    "섹터 ETF 수신 실패: XLC"
-  ],
+  "errors": [],
   "sectors": [
+    {
+      "ticker": "XLC",
+      "name": "커뮤니케이션",
+      "date": "2026-08-28",
+      "open": 111.87,
+      "high": 113.53,
+      "low": 111.83,
+      "close": 112.99,
+      "change_pct": 1.42,
+      "volume": 3743500,
+      "avg_volume_20d": 4373720,
+      "volume_ratio": 0.86,
+      "close_position_pct": 68.2,
+      "change_5d_pct": 1.43
+    },
     {
       "ticker": "XLY",
       "name": "임의소비재",
