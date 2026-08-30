@@ -1,11 +1,11 @@
 {
-  "generated_at_kst": "2026-08-30 16:59:27",
+  "generated_at_kst": "2026-08-30 17:19:22",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
   "errors": [
-    "국내 전체 스캔: KeyError: '지수명'"
+    "국내 전체 스캔: KRX 시세 조회 불가 (기준일 20260828)"
   ],
   "sectors": [
     {
