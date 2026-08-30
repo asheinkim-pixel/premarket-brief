@@ -12,15 +12,16 @@ permissions:
 jobs:
   collect:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      # Node 24 대응 버전
+      - uses: actions/checkout@v5
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v6
         with:
           python-version: "3.12"
 
-      - run: pip install --quiet yfinance pandas lxml
+      - run: pip install --quiet yfinance pandas lxml pykrx
 
       - name: 시세 수집
         run: |
@@ -334,6 +335,140 @@ jobs:
               return None, None
 
 
+          # ---------------------------------------------------------------- 국내 전체 스캔
+
+          SCAN_MIN_MARKET_CAP = 100_000_000_000   # 시가총액 1,000억 원 미만 제외
+          SCAN_VOLUME_RATIO = 2.0                 # 거래량 20일 평균 대비 배수 기준
+          SCAN_CHANGE_PCT = 5.0                   # 등락률 기준 (%)
+          SCAN_TOP_N = 20                         # 최종 보고 종목 수
+
+
+          def _is_excluded_name(name):
+              """스팩·우선주·리츠 등 단타 스크리닝에 부적합한 종목명을 걸러낸다."""
+              if not name:
+                  return True
+              if "스팩" in name:
+                  return True
+              if name.endswith(("우", "우B", "우C", "1우", "2우B", "3우B")):
+                  return True
+              return False
+
+
+          def scan_kr_market(watchlist_codes):
+              """코스피·코스닥 전 종목에서 거래량 급증 또는 급등 종목을 찾는다.
+
+              관심 종목 37개 밖의 국내 단독 재료를 잡기 위한 단계다.
+              실패하면 None을 돌려주고 브리핑에서 이 항목은 생략된다.
+              """
+              try:
+                  from pykrx import stock
+              except ImportError:
+                  print("pykrx 미설치 — 국내 전체 스캔 건너뜀", file=sys.stderr)
+                  return None, "pykrx 미설치"
+
+              try:
+                  today = datetime.now(KST).strftime("%Y%m%d")
+                  start = (datetime.now(KST) - timedelta(days=60)).strftime("%Y%m%d")
+
+                  # 실제 거래일 목록을 코스피 지수(1001)에서 한 번에 얻는다
+                  idx = stock.get_index_ohlcv(start, today, "1001")
+                  if idx is None or len(idx) < 21:
+                      return None, "거래일 목록 수신 실패"
+                  days = [d.strftime("%Y%m%d") for d in idx.index[-21:]]
+                  target = days[-1]
+                  print(f"국내 전체 스캔 기준일: {target} (거래일 {len(days)}일 확보)")
+
+                  # 기준일 시세와 시가총액
+                  base = stock.get_market_ohlcv(target, market="ALL")
+                  caps = stock.get_market_cap(target, market="ALL")
+                  if base is None or len(base) == 0:
+                      return None, "기준일 시세 수신 실패"
+
+                  # 직전 20거래일 거래량 평균
+                  vols = {}
+                  for d in days[:-1]:
+                      try:
+                          df = stock.get_market_ohlcv(d, market="ALL")
+                          for code, v in df["거래량"].items():
+                              vols.setdefault(code, []).append(float(v))
+                      except Exception:                               # noqa: BLE001
+                          continue
+                  print(f"거래량 평균 계산에 사용한 거래일: {len(days) - 1}일")
+
+                  rows = []
+                  for code, r in base.iterrows():
+                      try:
+                          o, h, l, c = (float(r["시가"]), float(r["고가"]),
+                                        float(r["저가"]), float(r["종가"]))
+                          vol = float(r["거래량"])
+                          chg = float(r["등락률"])
+                      except (KeyError, TypeError, ValueError):
+                          continue
+                      if c <= 0 or vol <= 0:
+                          continue
+
+                      cap = None
+                      try:
+                          cap = float(caps.loc[code, "시가총액"])
+                      except Exception:                               # noqa: BLE001
+                          pass
+                      if cap is None or cap < SCAN_MIN_MARKET_CAP:
+                          continue
+
+                      hist = vols.get(code, [])
+                      if len(hist) < 10:
+                          continue
+                      avg = sum(hist) / len(hist)
+                      if avg <= 0:
+                          continue
+                      vr = round(vol / avg, 2)
+
+                      # 선정 기준: 거래량 급증 또는 급등
+                      if vr < SCAN_VOLUME_RATIO and chg < SCAN_CHANGE_PCT:
+                          continue
+
+                      rows.append({
+                          "code": code,
+                          "close": int(c), "open": int(o), "high": int(h), "low": int(l),
+                          "change_pct": round(chg, 2),
+                          "volume": int(vol),
+                          "avg_volume_20d": int(avg),
+                          "volume_ratio": vr,
+                          "close_position_pct": close_position(o, h, l, c),
+                          "market_cap": int(cap),
+                          "in_watchlist": code in watchlist_codes,
+                      })
+
+                  # 거래량비와 등락률을 함께 반영해 정렬
+                  rows.sort(key=lambda x: (x["volume_ratio"] * 2 + abs(x["change_pct"]) / 5),
+                            reverse=True)
+
+                  out = []
+                  for r in rows:
+                      if len(out) >= SCAN_TOP_N:
+                          break
+                      try:
+                          name = stock.get_market_ticker_name(r["code"])
+                      except Exception:                               # noqa: BLE001
+                          name = None
+                      if _is_excluded_name(name):
+                          continue
+                      r["name"] = name
+                      out.append(r)
+
+                  print(f"국내 전체 스캔: 조건 통과 {len(rows)}종목 → 보고 {len(out)}종목")
+                  return {"date": target, "candidates": out,
+                          "criteria": {
+                              "min_market_cap": SCAN_MIN_MARKET_CAP,
+                              "volume_ratio": SCAN_VOLUME_RATIO,
+                              "change_pct": SCAN_CHANGE_PCT,
+                          }}, None
+
+              except Exception as e:                                  # noqa: BLE001
+                  print(f"국내 전체 스캔 실패: {type(e).__name__}: {e}", file=sys.stderr)
+                  return None, f"{type(e).__name__}: {e}"
+
+
           # ---------------------------------------------------------------- 본체
 
           def main():
@@ -397,6 +532,12 @@ jobs:
               kr_rows.sort(key=lambda r: r["change_pct"] or -999, reverse=True)
               result["kr_watchlist"] = kr_rows
               result["kr_date"] = kr_rows[0]["date"] if kr_rows else None
+
+              # --- 국내 전체 시장 스캔 (관심 종목 밖의 국내 단독 재료)
+              scan, scan_err = scan_kr_market(set(KR_WATCHLIST))
+              result["kr_market_scan"] = scan
+              if scan_err:
+                  result["errors"].append(f"국내 전체 스캔: {scan_err}")
 
               # --- 저장
               os.makedirs("data", exist_ok=True)
