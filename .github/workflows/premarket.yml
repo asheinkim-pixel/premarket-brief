@@ -1,0 +1,616 @@
+name: 미장 마감 시세 수집
+
+on:
+  schedule:
+    # 22:00 UTC = 07:00 KST (일~목 실행 → 한국 월~금 아침)
+    - cron: "0 22 * * 0-4"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  collect:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+
+      - run: pip install --quiet yfinance pandas lxml pykrx
+
+      - name: 시세 수집
+        run: |
+          cat > fetch_market.py <<'PYEOF'
+          """
+          미장 마감 → 국장 개장 전 브리핑: 시세 수집 스크립트
+
+          GitHub Actions에서 매 거래일 실행된다.
+          yfinance로 미국(나스닥100 + 섹터 ETF)과 한국(관심 종목) 시세를 받아
+          계산까지 마친 JSON을 data/ 아래에 저장한다.
+
+          Claude는 이 JSON만 읽는다. 웹페이지에서 숫자를 긁지 않는다.
+          """
+
+          import json
+          import os
+          import sys
+          import tempfile
+          import time
+          from datetime import datetime, timedelta, timezone
+
+          import pandas as pd
+          import yfinance as yf
+
+          KST = timezone(timedelta(hours=9))
+
+          # yfinance는 시간대 정보를 sqlite에 캐시한다. 여러 스레드가 같은 파일을
+          # 건드리면 'database is locked'가 나면서 종목이 통째로 누락된다.
+          # 실행마다 새 디렉터리를 쓰게 해서 경합을 없앤다.
+          try:
+              yf.set_tz_cache_location(tempfile.mkdtemp(prefix="yf-tz-"))
+          except Exception:                                           # noqa: BLE001
+              pass
+
+          # ---------------------------------------------------------------- 설정
+
+          SECTOR_ETFS = {
+              "XLK": "기술",
+              "XLV": "헬스케어",
+              "XLF": "금융",
+              "XLE": "에너지",
+              "XLI": "산업",
+              "XLY": "임의소비재",
+              "XLP": "필수소비재",
+              "XLB": "소재",
+              "XLRE": "부동산",
+              "XLU": "유틸리티",
+              "XLC": "커뮤니케이션",
+          }
+
+          # 국내 관심 종목. 코드만 적으면 .KS(코스피) / .KQ(코스닥)를 자동으로 시도한다.
+          KR_WATCHLIST = {
+              # 반도체 · AI
+              "005930": "삼성전자",
+              "000660": "SK하이닉스",
+              "042700": "한미반도체",
+              "007660": "이수페타시스",
+              "058470": "리노공업",
+              "403870": "HPSP",
+              "036930": "주성엔지니어링",
+              # 전력기기 · 데이터센터
+              "010120": "LS일렉트릭",
+              "267260": "HD현대일렉트릭",
+              "298040": "효성중공업",
+              "001440": "대한전선",
+              # 방산
+              "012450": "한화에어로스페이스",
+              "079550": "LIG넥스원",
+              "064350": "현대로템",
+              "047810": "한국항공우주",
+              # 조선 · 해운
+              "009540": "HD한국조선해양",
+              "042660": "한화오션",
+              "010140": "삼성중공업",
+              "028670": "팬오션",
+              "005880": "대한해운",
+              "011200": "HMM",
+              # 2차전지
+              "373220": "LG에너지솔루션",
+              "006400": "삼성SDI",
+              "247540": "에코프로비엠",
+              "003670": "포스코퓨처엠",
+              # 바이오
+              "128940": "한미약품",
+              "087010": "펩트론",
+              "207940": "삼성바이오로직스",
+              # 원자력
+              "034020": "두산에너빌리티",
+              "052690": "한전기술",
+              # 우주 · 위성
+              "272210": "한화시스템",
+              "451760": "컨텍",
+              "211270": "AP위성",
+              # 비트코인 연관
+              "041190": "우리기술투자",
+              "003530": "한화투자증권",
+              # 로봇
+              "277810": "레인보우로보틱스",
+              "454910": "두산로보틱스",
+          }
+
+          # 나스닥100 구성 종목을 위키피디아에서 못 받을 때 쓰는 예비 목록.
+          # 구성 종목은 바뀌므로 가끔 손으로 갱신할 것.
+          NDX_FALLBACK = [
+              "AAPL", "MSFT", "NVDA", "AMZN", "GOOGL", "GOOG", "META", "AVGO", "TSLA",
+              "COST", "NFLX", "AMD", "PEP", "ADBE", "CSCO", "LIN", "TMUS", "INTU",
+              "TXN", "QCOM", "AMAT", "CMCSA", "AMGN", "ISRG", "HON", "BKNG", "VRTX",
+              "ADP", "PANW", "MU", "ADI", "GILD", "REGN", "LRCX", "MDLZ", "SBUX",
+              "KLAC", "SNPS", "CDNS", "MELI", "PYPL", "MAR", "CRWD", "CTAS", "ORLY",
+              "CSX", "ASML", "ABNB", "MRVL", "FTNT", "ADSK", "DASH", "WDAY", "CHTR",
+              "NXPI", "PCAR", "ROP", "TTD", "MNST", "AEP", "PAYX", "ODFL", "FAST",
+              "KDP", "ROST", "EA", "VRSK", "DDOG", "BKR", "XEL", "CTSH", "KHC",
+              "LULU", "GEHC", "CCEP", "EXC", "TEAM", "MCHP", "IDXX", "ZS",
+              "ON", "CSGP", "DXCM", "CDW", "TTWO", "WBD", "GFS", "MDB", "BIIB",
+              "ARM", "MSTR", "WDC", "INTC", "SMCI", "PLTR", "APP", "AXON", "SPCX",
+          ]
+
+          TOP_GAIN_THRESHOLD = 2.0    # 강세 기준 (%)
+          TOP_LOSS_THRESHOLD = -3.0   # 약세 기준 (%)
+
+
+          # ---------------------------------------------------------------- 유틸
+
+          def pct(a, b):
+              """b 대비 a의 변화율(%). 계산 불가면 None."""
+              if a is None or b in (None, 0):
+                  return None
+              return round((a - b) / b * 100, 2)
+
+
+          def close_position(o, h, l, c):
+              """캔들 내 종가 위치(%). 고가=저가면 None."""
+              if None in (h, l, c) or h == l:
+                  return None
+              return round((c - l) / (h - l) * 100, 1)
+
+
+          def fetch_one(ticker, period="3mo"):
+              """종목 하나를 개별 조회한다. 실패하면 None."""
+              try:
+                  df = yf.Ticker(ticker).history(
+                      period=period, interval="1d", auto_adjust=False
+                  )
+                  df = df.dropna(subset=["Close"])
+                  return df if len(df) >= 2 else None
+              except Exception:                                       # noqa: BLE001
+                  return None
+
+
+          def fetch_history(tickers, period="3mo", threads=True):
+              """여러 종목의 일봉을 받아 {티커: DataFrame}으로 돌려준다.
+
+              일괄 조회에서 빠진 종목은 개별로 다시 시도한다. yfinance의 시간대
+              캐시(sqlite)가 스레드 경합으로 'database is locked'를 내는 경우가
+              있는데, 재시도로 대부분 회수된다.
+              """
+              if not tickers:
+                  return {}
+
+              out = {}
+              try:
+                  raw = yf.download(
+                      tickers,
+                      period=period,
+                      interval="1d",
+                      group_by="ticker",
+                      auto_adjust=False,
+                      progress=False,
+                      threads=threads,
+                  )
+                  for t in tickers:
+                      try:
+                          df = raw[t] if isinstance(raw.columns, pd.MultiIndex) else raw
+                          df = df.dropna(subset=["Close"])
+                          if len(df) >= 2:
+                              out[t] = df
+                      except (KeyError, TypeError):
+                          continue
+              except Exception as e:                                  # noqa: BLE001
+                  print(f"일괄 조회 실패, 개별 조회로 전환: {e}", file=sys.stderr)
+
+              missing = [t for t in tickers if t not in out]
+              if missing:
+                  print(f"개별 재시도 {len(missing)}종목: {', '.join(missing[:10])}"
+                        f"{' 외' if len(missing) > 10 else ''}")
+                  for t in missing:
+                      for attempt in range(3):
+                          df = fetch_one(t, period)
+                          if df is not None:
+                              out[t] = df
+                              print(f"  {t} 회수 성공 ({attempt + 1}회차)")
+                              break
+                          time.sleep(2 * (attempt + 1))   # 2초 → 4초 → 6초
+                      else:
+                          print(f"  {t} 회수 실패 (3회 시도)")
+
+              return out
+
+
+          def summarize(ticker, df, name=None):
+              """마지막 거래일 기준 지표를 뽑는다."""
+              last = df.iloc[-1]
+              prev = df.iloc[-2]
+
+              o, h, l, c = (
+                  float(last["Open"]), float(last["High"]),
+                  float(last["Low"]), float(last["Close"]),
+              )
+              vol = int(last["Volume"]) if not pd.isna(last["Volume"]) else None
+              avg_vol = df["Volume"].tail(21).head(20).mean()
+              avg_vol = int(avg_vol) if not pd.isna(avg_vol) else None
+
+              row = {
+                  "ticker": ticker,
+                  "name": name,
+                  "date": df.index[-1].strftime("%Y-%m-%d"),
+                  "open": round(o, 2),
+                  "high": round(h, 2),
+                  "low": round(l, 2),
+                  "close": round(c, 2),
+                  "change_pct": pct(c, float(prev["Close"])),
+                  "volume": vol,
+                  "avg_volume_20d": avg_vol,
+                  "volume_ratio": round(vol / avg_vol, 2) if vol and avg_vol else None,
+                  "close_position_pct": close_position(o, h, l, c),
+              }
+
+              if len(df) >= 6:
+                  row["change_5d_pct"] = pct(c, float(df.iloc[-6]["Close"]))
+              return row
+
+
+          UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
+                "(KHTML, like Gecko) Chrome/126.0 Safari/537.36")
+
+
+          def _read_tables(url):
+              """User-Agent를 붙여 HTML을 받아 표로 파싱한다.
+
+              pandas.read_html 은 기본 요청에 User-Agent가 없어 위키피디아 등에서
+              403을 받는다. 직접 받아서 넘긴다.
+              """
+              import io
+              import urllib.request
+
+              req = urllib.request.Request(url, headers={
+                  "User-Agent": UA,
+                  "Accept": "text/html,application/xhtml+xml",
+                  "Accept-Language": "en-US,en;q=0.9",
+              })
+              html = urllib.request.urlopen(req, timeout=30).read().decode("utf-8", "replace")
+              return pd.read_html(io.StringIO(html))
+
+
+          def _extract_symbols(tables):
+              """표 목록에서 티커 열을 찾아 90~110개짜리 목록을 돌려준다.
+
+              열 이름이 다층(MultiIndex)이거나 'Ticker symbol'처럼 변형된 경우도
+              잡히도록 부분 일치로 찾는다.
+              """
+              for t in tables:
+                  cols = []
+                  for c in t.columns:
+                      if isinstance(c, tuple):
+                          c = " ".join(str(x) for x in c if "Unnamed" not in str(x))
+                      cols.append(str(c).strip().lower())
+
+                  for i, name in enumerate(cols):
+                      if "ticker" not in name and "symbol" not in name:
+                          continue
+                      syms = [str(s).strip().upper().replace(".", "-")
+                              for s in t[t.columns[i]].tolist() if str(s).strip()]
+                      syms = [s for s in syms
+                              if 1 <= len(s) <= 6 and s.isascii() and s.replace("-", "").isalpha()]
+                      if 90 <= len(syms) <= 110:
+                          return syms
+              return None
+
+
+          def get_ndx_tickers():
+              """나스닥100 구성 종목.
+
+              출처를 순서대로 시도하고, 전부 실패하면 예비 목록을 쓴다.
+              예비 목록은 시간이 지나면 낡으므로 ndx_source 값을 항상 확인할 것.
+              """
+              sources = [
+                  ("wikipedia", "https://en.wikipedia.org/wiki/Nasdaq-100"),
+                  ("slickcharts", "https://www.slickcharts.com/nasdaq100"),
+              ]
+              for name, url in sources:
+                  try:
+                      syms = _extract_symbols(_read_tables(url))
+                      if syms:
+                          print(f"나스닥100 구성 종목 수신 ({name}): {len(syms)}종목")
+                          return syms, name
+                      print(f"{name}: 티커 열을 찾지 못함", file=sys.stderr)
+                  except Exception as e:                              # noqa: BLE001
+                      print(f"{name} 조회 실패: {e}", file=sys.stderr)
+
+              print("모든 출처 실패 — 예비 목록 사용 (낡았을 수 있음)", file=sys.stderr)
+              return sorted(set(NDX_FALLBACK)), "fallback"
+
+
+          def resolve_kr(code):
+              """코스피(.KS) → 코스닥(.KQ) 순으로 시도해 데이터가 있는 쪽을 쓴다."""
+              for suffix in (".KS", ".KQ"):
+                  sym = code + suffix
+                  try:
+                      df = yf.Ticker(sym).history(period="3mo", auto_adjust=False)
+                      if len(df.dropna(subset=["Close"])) >= 2:
+                          return sym, df.dropna(subset=["Close"])
+                  except Exception:                                   # noqa: BLE001
+                      continue
+              return None, None
+
+
+          # ---------------------------------------------------------------- 국내 전체 스캔
+
+          SCAN_MIN_MARKET_CAP = 100_000_000_000   # 시가총액 1,000억 원 미만 제외
+          SCAN_VOLUME_RATIO = 2.0                 # 거래량 20일 평균 대비 배수 기준
+          SCAN_CHANGE_PCT = 5.0                   # 등락률 기준 (%)
+          SCAN_TOP_N = 20                         # 최종 보고 종목 수
+
+
+          def _is_excluded_name(name):
+              """스팩·우선주·리츠 등 단타 스크리닝에 부적합한 종목명을 걸러낸다."""
+              if not name:
+                  return True
+              if "스팩" in name:
+                  return True
+              if name.endswith(("우", "우B", "우C", "1우", "2우B", "3우B")):
+                  return True
+              return False
+
+
+          def _krx_ohlcv(stock, date):
+              """pykrx 버전에 따라 함수 이름이 다르므로 둘 다 시도한다."""
+              for fn in ("get_market_ohlcv", "get_market_ohlcv_by_ticker"):
+                  f = getattr(stock, fn, None)
+                  if f is None:
+                      continue
+                  try:
+                      df = f(date, market="ALL")
+                      if df is not None and len(df) > 0:
+                          return df
+                  except Exception:                                   # noqa: BLE001
+                      continue
+              return None
+
+
+          def scan_kr_market(watchlist_codes, trading_days):
+              """코스피·코스닥 전 종목에서 거래량 급증 또는 급등 종목을 찾는다.
+
+              거래일 목록은 yfinance로 이미 받아둔 국내 종목 데이터에서 뽑아 쓴다.
+              pykrx의 지수 조회(get_index_ohlcv)는 GitHub Actions에서 응답이
+              JSON이 아니라 실패하므로 호출하지 않는다.
+
+              실패하면 None을 돌려주고 브리핑에서 이 항목은 생략된다.
+              """
+              try:
+                  from pykrx import stock
+              except ImportError:
+                  print("pykrx 미설치 — 국내 전체 스캔 건너뜀", file=sys.stderr)
+                  return None, "pykrx 미설치"
+
+              if not trading_days or len(trading_days) < 11:
+                  return None, f"거래일 부족 ({len(trading_days or [])}일)"
+
+              try:
+                  days = trading_days[-21:]
+                  target = days[-1]
+
+                  # 먼저 한 번 호출해 KRX 접근 자체가 되는지 확인한다
+                  base = _krx_ohlcv(stock, target)
+                  if base is None or len(base) == 0:
+                      return None, f"KRX 시세 조회 불가 (기준일 {target})"
+                  print(f"국내 전체 스캔 기준일: {target} "
+                        f"(거래일 {len(days)}일 / 전 종목 {len(base)}개 수신)")
+
+                  try:
+                      caps = stock.get_market_cap(target, market="ALL")
+                  except Exception as e:                              # noqa: BLE001
+                      print(f"시가총액 수신 실패, 시총 필터 없이 진행: {e}", file=sys.stderr)
+                      caps = None
+
+                  # 직전 20거래일 거래량 평균
+                  vols = {}
+                  used = 0
+                  for d in days[:-1]:
+                      df = _krx_ohlcv(stock, d)
+                      if df is None:
+                          continue
+                      used += 1
+                      for code, v in df["거래량"].items():
+                          vols.setdefault(code, []).append(float(v))
+                  print(f"거래량 평균 계산에 사용한 거래일: {used}일")
+                  if used < 5:
+                      return None, f"과거 거래일 수신 부족 ({used}일)"
+
+                  rows = []
+                  for code, r in base.iterrows():
+                      try:
+                          o, h, l, c = (float(r["시가"]), float(r["고가"]),
+                                        float(r["저가"]), float(r["종가"]))
+                          vol = float(r["거래량"])
+                          chg = float(r["등락률"])
+                      except (KeyError, TypeError, ValueError):
+                          continue
+                      if c <= 0 or vol <= 0:
+                          continue
+
+                      cap = None
+                      if caps is not None:
+                          try:
+                              cap = float(caps.loc[code, "시가총액"])
+                          except Exception:                           # noqa: BLE001
+                              pass
+                          if cap is None or cap < SCAN_MIN_MARKET_CAP:
+                              continue
+
+                      hist = vols.get(code, [])
+                      if len(hist) < 10:
+                          continue
+                      avg = sum(hist) / len(hist)
+                      if avg <= 0:
+                          continue
+                      vr = round(vol / avg, 2)
+
+                      # 선정 기준: 거래량 급증 또는 급등
+                      if vr < SCAN_VOLUME_RATIO and chg < SCAN_CHANGE_PCT:
+                          continue
+
+                      rows.append({
+                          "code": code,
+                          "close": int(c), "open": int(o), "high": int(h), "low": int(l),
+                          "change_pct": round(chg, 2),
+                          "volume": int(vol),
+                          "avg_volume_20d": int(avg),
+                          "volume_ratio": vr,
+                          "close_position_pct": close_position(o, h, l, c),
+                          "market_cap": int(cap) if cap else None,
+                          "in_watchlist": code in watchlist_codes,
+                      })
+
+                  # 거래량비와 등락률을 함께 반영해 정렬
+                  rows.sort(key=lambda x: (x["volume_ratio"] * 2 + abs(x["change_pct"]) / 5),
+                            reverse=True)
+
+                  out = []
+                  for r in rows:
+                      if len(out) >= SCAN_TOP_N:
+                          break
+                      try:
+                          name = stock.get_market_ticker_name(r["code"])
+                      except Exception:                               # noqa: BLE001
+                          name = None
+                      if _is_excluded_name(name):
+                          continue
+                      r["name"] = name
+                      out.append(r)
+
+                  print(f"국내 전체 스캔: 조건 통과 {len(rows)}종목 → 보고 {len(out)}종목")
+                  return {"date": target, "candidates": out,
+                          "criteria": {
+                              "min_market_cap": SCAN_MIN_MARKET_CAP,
+                              "volume_ratio": SCAN_VOLUME_RATIO,
+                              "change_pct": SCAN_CHANGE_PCT,
+                          }}, None
+
+              except Exception as e:                                  # noqa: BLE001
+                  print(f"국내 전체 스캔 실패: {type(e).__name__}: {e}", file=sys.stderr)
+                  return None, f"{type(e).__name__}: {e}"
+
+
+          # ---------------------------------------------------------------- 본체
+
+          def main():
+              now_kst = datetime.now(KST)
+              print(f"실행 시각 (KST): {now_kst:%Y-%m-%d %H:%M}")
+
+              result = {
+                  "generated_at_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
+                  "thresholds": {"gain": TOP_GAIN_THRESHOLD, "loss": TOP_LOSS_THRESHOLD},
+                  "errors": [],
+              }
+
+              # 시간대 캐시(sqlite)를 단일 스레드로 미리 한 번 채워둔다.
+              # 여러 스레드가 빈 캐시에 동시에 쓰려 하면 'database is locked'가 나면서
+              # 종목이 통째로 누락된다. 미리 만들어두면 이후 병렬 조회가 읽기만 한다.
+              warm = fetch_one("SPY", period="5d")
+              print(f"시간대 캐시 예열: {'성공' if warm is not None else '실패(계속 진행)'}")
+
+              # --- 미국 섹터 ETF (11개뿐이라 순차 조회해도 느리지 않다)
+              etf_hist = fetch_history(list(SECTOR_ETFS), threads=False)
+              sectors = []
+              for tkr, kor in SECTOR_ETFS.items():
+                  if tkr not in etf_hist:
+                      result["errors"].append(f"섹터 ETF 수신 실패: {tkr}")
+                      continue
+                  row = summarize(tkr, etf_hist[tkr], kor)
+                  sectors.append(row)
+              sectors.sort(key=lambda r: r["change_pct"] or -999, reverse=True)
+              result["sectors"] = sectors
+              result["us_date"] = sectors[0]["date"] if sectors else None
+
+              # --- 나스닥100
+              ndx, ndx_source = get_ndx_tickers()
+              result["ndx_source"] = ndx_source
+              ndx_hist = fetch_history(ndx)
+              ndx_rows = []
+              for tkr in ndx:
+                  if tkr not in ndx_hist:
+                      continue
+                  ndx_rows.append(summarize(tkr, ndx_hist[tkr]))
+
+              result["ndx_count"] = len(ndx_rows)
+              result["ndx_gainers"] = sorted(
+                  [r for r in ndx_rows if (r["change_pct"] or 0) >= TOP_GAIN_THRESHOLD],
+                  key=lambda r: r["change_pct"], reverse=True,
+              )
+              result["ndx_losers"] = sorted(
+                  [r for r in ndx_rows if (r["change_pct"] or 0) <= TOP_LOSS_THRESHOLD],
+                  key=lambda r: r["change_pct"],
+              )
+              # 거래량이 평소보다 크게 실린 종목 (등락 방향 무관)
+              result["ndx_volume_spikes"] = sorted(
+                  [r for r in ndx_rows if (r["volume_ratio"] or 0) >= 2.0],
+                  key=lambda r: r["volume_ratio"], reverse=True,
+              )[:15]
+
+              # --- 국내 관심 종목
+              kr_rows = []
+              kr_frames = []
+              for code, name in KR_WATCHLIST.items():
+                  sym, df = resolve_kr(code)
+                  if df is None:
+                      result["errors"].append(f"국내 종목 수신 실패: {name}({code})")
+                      continue
+                  kr_frames.append(df)
+                  row = summarize(sym, df, name)
+                  row["code"] = code
+                  kr_rows.append(row)
+              kr_rows.sort(key=lambda r: r["change_pct"] or -999, reverse=True)
+              result["kr_watchlist"] = kr_rows
+              result["kr_date"] = kr_rows[0]["date"] if kr_rows else None
+
+              # --- 국내 전체 시장 스캔 (관심 종목 밖의 국내 단독 재료)
+              # 거래일 목록은 방금 받은 국내 종목 데이터에서 뽑는다.
+              # pykrx 지수 조회는 GitHub Actions에서 실패하므로 쓰지 않는다.
+              trading_days = []
+              if kr_frames:
+                  longest = max(kr_frames, key=len)
+                  trading_days = [d.strftime("%Y%m%d") for d in longest.index]
+              print(f"국내 거래일 {len(trading_days)}일 확보 "
+                    f"({trading_days[0] if trading_days else '-'} ~ "
+                    f"{trading_days[-1] if trading_days else '-'})")
+
+              scan, scan_err = scan_kr_market(set(KR_WATCHLIST), trading_days)
+              result["kr_market_scan"] = scan
+              if scan_err:
+                  result["errors"].append(f"국내 전체 스캔: {scan_err}")
+
+              # --- 저장
+              os.makedirs("data", exist_ok=True)
+              stamp = now_kst.strftime("%Y-%m-%d")
+              for path in (f"data/{stamp}.json", "data/latest.json"):
+                  with open(path, "w", encoding="utf-8") as f:
+                      json.dump(result, f, ensure_ascii=False, indent=2)
+
+              print(f"미국 기준일: {result['us_date']} / 한국 기준일: {result['kr_date']}")
+              print(f"나스닥100 수신 {result['ndx_count']}종목 "
+                    f"(강세 {len(result['ndx_gainers'])} / 약세 {len(result['ndx_losers'])})")
+              print(f"국내 수신 {len(kr_rows)}종목")
+              if result["errors"]:
+                  print("경고:", *result["errors"], sep="\n  ")
+
+
+          if __name__ == "__main__":
+              main()
+          PYEOF
+          python fetch_market.py
+
+      - name: 결과 커밋
+        run: |
+          git config user.name  "premarket-bot"
+          git config user.email "premarket-bot@users.noreply.github.com"
+          git add data/
+          if git diff --staged --quiet; then
+            echo "변경 없음 — 커밋 건너뜀"
+          else
+            git commit -m "시세 수집 $(TZ=Asia/Seoul date +'%Y-%m-%d %H:%M KST')"
+            git push
+          fi
