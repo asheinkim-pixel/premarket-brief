@@ -20,7 +20,7 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install --quiet yfinance pandas lxml pykrx
+      - run: pip install --quiet yfinance pandas lxml
 
       - name: 시세 수집
         run: |
@@ -121,6 +121,216 @@ jobs:
               "277810": "레인보우로보틱스",
               "454910": "두산로보틱스",
           }
+
+          # 국내 전체 스캔 대상. 코스피 시가총액 상위 종목이며 전부 .KS 를 붙인다.
+          # 출처: stockanalysis.com/list/korea-stock-exchange (종목코드·회사명 확인용)
+          # 관심 종목 37개는 여기서 제외돼 있다 (중복 조회 방지).
+          KR_UNIVERSE = {
+              "402340": "SK Square",
+              "009150": "Samsung Electro-Mechanics",
+              "005380": "Hyundai Motor",
+              "028260": "Samsung C&T",
+              "105560": "KB Financial Group",
+              "032830": "Samsung Life Insurance",
+              "055550": "Shinhan Financial Group",
+              "000270": "Kia",
+              "329180": "HD Hyundai Heavy Industries",
+              "068270": "Celltrion",
+              "012330": "Hyundai Mobis",
+              "086790": "Hana Financial Group",
+              "066570": "LG Electronics",
+              "035420": "NAVER",
+              "034730": "SK Inc.",
+              "000810": "Samsung Fire & Marine",
+              "010130": "Korea Zinc",
+              "005490": "POSCO Holdings",
+              "316140": "Woori Financial Group",
+              "015760": "KEPCO",
+              "017670": "SK Telecom",
+              "051910": "LG Chem",
+              "138040": "Meritz Financial Group",
+              "096770": "SK Innovation",
+              "033780": "KT&G",
+              "018260": "Samsung SDS",
+              "000150": "Doosan",
+              "006800": "Mirae Asset Securities",
+              "003550": "LG Corp.",
+              "278470": "APR",
+              "024110": "Industrial Bank of Korea",
+              "010950": "S-Oil",
+              "035720": "Kakao",
+              "086280": "Hyundai Glovis",
+              "267250": "HD Hyundai",
+              "000720": "Hyundai E&C",
+              "011070": "LG Innotek",
+              "030200": "KT",
+              "078930": "GS Holdings",
+              "307950": "Hyundai Autoever",
+              "003230": "Samyang Foods",
+              "005830": "DB Insurance",
+              "071050": "Korea Investment Holdings",
+              "003490": "Korean Air",
+              "323410": "KakaoBank",
+              "259960": "KRAFTON",
+              "005940": "NH Investment & Securities",
+              "443060": "HD Hyundai Marine Solution",
+              "028050": "Samsung E&A",
+              "047050": "Posco International",
+              "090430": "Amorepacific",
+              "180640": "Hanjin Kal",
+              "006260": "LS Corp.",
+              "161390": "Hankook Tire",
+              "016360": "Samsung Securities",
+              "047040": "Daewoo E&C",
+              "352820": "HYBE",
+              "039490": "Kiwoom Securities",
+              "009830": "Hanwha Solutions",
+              "064400": "LG CNS",
+              "326030": "SK Biopharmaceuticals",
+              "021240": "COWAY",
+              "267270": "HD Construction Equipment",
+              "377300": "Kakao Pay",
+              "032640": "LG Uplus",
+              "000500": "GAON CABLE",
+              "000100": "Yuhan",
+              "241560": "Doosan Bobcat",
+              "000880": "Hanwha Corp.",
+              "062040": "Sanil Electric",
+              "353200": "DAEDUCK ELECTRONICS",
+              "175330": "JB Financial Group",
+              "010060": "OCI Holdings",
+              "271560": "ORION",
+              "029780": "Samsung Card",
+              "066970": "L&F",
+              "051900": "LG H&H",
+              "034220": "LG Display",
+              "138930": "BNK Financial Group",
+              "036570": "NC Corporation",
+              "001040": "CJ Corporation",
+              "088350": "Hanwha Life Insurance",
+              "004020": "Hyundai Steel",
+              "001450": "Hyundai Marine & Fire",
+              "082740": "Hanwha Engine",
+              "000990": "DB HiTek",
+              "004170": "SHINSEGAE",
+              "018880": "Hanon Systems",
+              "085620": "MIRAE ASSET Life",
+              "161890": "Kolmar Korea",
+              "002380": "KCC",
+              "103590": "Iljin Electric",
+              "036460": "Korea Gas",
+              "111770": "Youngone",
+              "009420": "Hanall Biopharma",
+              "006360": "GS E&C",
+              "192820": "Cosmax",
+              "022100": "Posco Dx",
+              "251270": "Netmarble",
+              "011790": "SKC",
+              "302440": "SK bioscience",
+              "336260": "Doosan Fuel Cell",
+              "031210": "Seoul Guarantee Insurance",
+              "011780": "Kumho Petrochemical",
+              "097950": "CJ CheilJedang",
+              "023530": "Lotte Shopping",
+              "035250": "Kangwon Land",
+              "012750": "S-1",
+              "375500": "DL E&C",
+              "008930": "Hanmi Science",
+              "139130": "iM Financial Group",
+              "483650": "d'Alba Global",
+              "017800": "Hyundai Elevator",
+              "004800": "Hyosung",
+              "489790": "Hanwha Vision",
+              "450080": "Ecopro Materials",
+              "003690": "Korean Reinsurance",
+              "026960": "Dong Suh",
+              "004370": "Nongshim",
+              "005850": "SL Corporation",
+              "282330": "BGF Retail",
+              "011170": "Lotte Chemical",
+              "383220": "F&F",
+              "007340": "DN Automotive",
+              "204320": "HL Mando",
+              "000240": "Hankook & Company",
+              "279570": "K Bank",
+              "007070": "GS Retail",
+              "103140": "Poongsan",
+              "005440": "Hyundai G.F. Holdings",
+              "081660": "Misto Holdings",
+              "002790": "AMOREPACIFIC Holdings",
+              "181710": "NHN",
+              "051600": "KEPCO KPS",
+              "018670": "SK Gas",
+              "014680": "Hansol Chemical",
+              "112610": "CS Wind",
+              "073240": "Kumho Tire",
+              "069960": "Hyundai Department Store",
+              "457190": "ISU Specialty Chemical",
+              "139480": "E-MART",
+              "030000": "Cheil Worldwide",
+              "462870": "SHIFT UP",
+              "475150": "SK eternix",
+              "439260": "Daehan Shipbuilding",
+              "009970": "Youngone Holdings",
+              "020150": "Lotte Energy Materials",
+              "004990": "LOTTE Corporation",
+              "071970": "HD Hyundai Marine Engine",
+              "089860": "LOTTE rental",
+              "006040": "Dongwon Industries",
+              "120110": "Kolon Industries",
+              "003540": "Daishin Securities",
+              "011210": "Hyundai Wia",
+              "023590": "Daou Technology",
+              "322000": "HD Hyundai Energy Solutions",
+              "008770": "Hotel Shilla",
+              "001800": "ORION Holdings",
+              "020560": "Asiana Airlines",
+              "097230": "HJ Shipbuilding",
+              "001430": "SeAH Besteel Holdings",
+              "361610": "SK IE Technology",
+              "006280": "GC Biopharma",
+              "000120": "CJ Logistics",
+              "007810": "Korea Circuit",
+              "294870": "HDC Hyundai Development",
+              "069620": "Daewoong Pharmaceutical",
+              "298020": "Hyosung TNC",
+              "001120": "LX International",
+              "229640": "LS Eco Energy",
+              "093370": "Foosung",
+              "001740": "SK Networks",
+              "005070": "Cosmo AM&T",
+              "281820": "KCTech",
+              "017960": "Hankuk Carbon",
+              "280360": "Lotte Wellfood",
+              "300720": "Hanil Cement",
+              "004000": "LOTTE Fine Chemical",
+              "192080": "DoubleUGames",
+              "001820": "SAMWHA CAPACITOR",
+              "000080": "HITEJINRO",
+              "077970": "STX Engine",
+              "005300": "Lotte Chilsung",
+              "009450": "Kyung Dong Navien",
+              "006120": "SK Discovery",
+              "195870": "HAESUNG DS",
+              "285130": "SK Chemicals",
+              "185750": "Chong Kun Dang",
+              "034230": "Paradise",
+              "100090": "SK oceanplant",
+              "005180": "Binggrae",
+              "004490": "Sebang Global Battery",
+              "003570": "SNT Dynamics",
+              "298050": "HS Hyosung Advanced Materials",
+              "137310": "SD Biosensor",
+              "214320": "Innocean Worldwide",
+              "456040": "OCI Company",
+              "002350": "Nexen Tire",
+              "108320": "LX Semicon",
+              "336370": "Solus Advanced Materials",
+              "178920": "PI Advanced Materials",
+              "090460": "BH Co.",
+              "003620": "KG Mobility",
+          }
+
 
           # 나스닥100 구성 종목을 위키피디아에서 못 받을 때 쓰는 예비 목록.
           # 구성 종목은 바뀌므로 가끔 손으로 갱신할 것.
@@ -339,7 +549,6 @@ jobs:
 
           # ---------------------------------------------------------------- 국내 전체 스캔
 
-          SCAN_MIN_MARKET_CAP = 100_000_000_000   # 시가총액 1,000억 원 미만 제외
           SCAN_VOLUME_RATIO = 2.0                 # 거래량 20일 평균 대비 배수 기준
           SCAN_CHANGE_PCT = 5.0                   # 등락률 기준 (%)
           SCAN_TOP_N = 20                         # 최종 보고 종목 수
@@ -356,143 +565,54 @@ jobs:
               return False
 
 
-          def _krx_ohlcv(stock, date):
-              """pykrx 버전에 따라 함수 이름이 다르므로 둘 다 시도한다."""
-              for fn in ("get_market_ohlcv", "get_market_ohlcv_by_ticker"):
-                  f = getattr(stock, fn, None)
-                  if f is None:
-                      continue
-                  try:
-                      df = f(date, market="ALL")
-                      if df is not None and len(df) > 0:
-                          return df
-                  except Exception:                                   # noqa: BLE001
-                      continue
-              return None
+          def scan_kr_universe(watchlist_codes):
+              """코스피 시총 상위 종목에서 거래량 급증 또는 급등 종목을 찾는다.
 
-
-          def scan_kr_market(watchlist_codes, trading_days):
-              """코스피·코스닥 전 종목에서 거래량 급증 또는 급등 종목을 찾는다.
-
-              거래일 목록은 yfinance로 이미 받아둔 국내 종목 데이터에서 뽑아 쓴다.
-              pykrx의 지수 조회(get_index_ohlcv)는 GitHub Actions에서 응답이
-              JSON이 아니라 실패하므로 호출하지 않는다.
-
-              실패하면 None을 돌려주고 브리핑에서 이 항목은 생략된다.
+              관심 종목 37개 밖의 국내 단독 재료를 잡기 위한 단계다.
+              KRX(pykrx)는 GitHub Actions에서 차단되므로 yfinance로 받는다.
               """
-              try:
-                  from pykrx import stock
-              except ImportError:
-                  print("pykrx 미설치 — 국내 전체 스캔 건너뜀", file=sys.stderr)
-                  return None, "pykrx 미설치"
+              codes = [c for c in KR_UNIVERSE if c not in watchlist_codes]
+              symbols = [c + ".KS" for c in codes]
+              print(f"국내 유니버스 스캔 시작: {len(symbols)}종목")
 
-              if not trading_days or len(trading_days) < 11:
-                  return None, f"거래일 부족 ({len(trading_days or [])}일)"
+              hist = {}
+              CHUNK = 60
+              for i in range(0, len(symbols), CHUNK):
+                  part = symbols[i:i + CHUNK]
+                  hist.update(fetch_history(part))
+                  print(f"  {min(i + CHUNK, len(symbols))}/{len(symbols)} 수신 "
+                        f"(누적 {len(hist)}종목)")
 
-              try:
-                  days = trading_days[-21:]
-                  target = days[-1]
+              if not hist:
+                  return None, "국내 유니버스 시세 수신 실패"
 
-                  # 먼저 한 번 호출해 KRX 접근 자체가 되는지 확인한다
-                  base = _krx_ohlcv(stock, target)
-                  if base is None or len(base) == 0:
-                      return None, f"KRX 시세 조회 불가 (기준일 {target})"
-                  print(f"국내 전체 스캔 기준일: {target} "
-                        f"(거래일 {len(days)}일 / 전 종목 {len(base)}개 수신)")
+              rows = []
+              for sym, df in hist.items():
+                  code = sym.split(".")[0]
+                  r = summarize(sym, df, KR_UNIVERSE.get(code))
+                  if r["change_pct"] is None or r["volume_ratio"] is None:
+                      continue
+                  # 선정 기준: 거래량 급증 또는 큰 등락
+                  if r["volume_ratio"] < SCAN_VOLUME_RATIO and abs(r["change_pct"]) < SCAN_CHANGE_PCT:
+                      continue
+                  if _is_excluded_name(r["name"]):
+                      continue
+                  r["code"] = code
+                  r["in_watchlist"] = False
+                  rows.append(r)
 
-                  try:
-                      caps = stock.get_market_cap(target, market="ALL")
-                  except Exception as e:                              # noqa: BLE001
-                      print(f"시가총액 수신 실패, 시총 필터 없이 진행: {e}", file=sys.stderr)
-                      caps = None
+              rows.sort(key=lambda x: x["volume_ratio"] * 2 + abs(x["change_pct"]) / 5,
+                        reverse=True)
+              out = rows[:SCAN_TOP_N]
 
-                  # 직전 20거래일 거래량 평균
-                  vols = {}
-                  used = 0
-                  for d in days[:-1]:
-                      df = _krx_ohlcv(stock, d)
-                      if df is None:
-                          continue
-                      used += 1
-                      for code, v in df["거래량"].items():
-                          vols.setdefault(code, []).append(float(v))
-                  print(f"거래량 평균 계산에 사용한 거래일: {used}일")
-                  if used < 5:
-                      return None, f"과거 거래일 수신 부족 ({used}일)"
-
-                  rows = []
-                  for code, r in base.iterrows():
-                      try:
-                          o, h, l, c = (float(r["시가"]), float(r["고가"]),
-                                        float(r["저가"]), float(r["종가"]))
-                          vol = float(r["거래량"])
-                          chg = float(r["등락률"])
-                      except (KeyError, TypeError, ValueError):
-                          continue
-                      if c <= 0 or vol <= 0:
-                          continue
-
-                      cap = None
-                      if caps is not None:
-                          try:
-                              cap = float(caps.loc[code, "시가총액"])
-                          except Exception:                           # noqa: BLE001
-                              pass
-                          if cap is None or cap < SCAN_MIN_MARKET_CAP:
-                              continue
-
-                      hist = vols.get(code, [])
-                      if len(hist) < 10:
-                          continue
-                      avg = sum(hist) / len(hist)
-                      if avg <= 0:
-                          continue
-                      vr = round(vol / avg, 2)
-
-                      # 선정 기준: 거래량 급증 또는 급등
-                      if vr < SCAN_VOLUME_RATIO and chg < SCAN_CHANGE_PCT:
-                          continue
-
-                      rows.append({
-                          "code": code,
-                          "close": int(c), "open": int(o), "high": int(h), "low": int(l),
-                          "change_pct": round(chg, 2),
-                          "volume": int(vol),
-                          "avg_volume_20d": int(avg),
-                          "volume_ratio": vr,
-                          "close_position_pct": close_position(o, h, l, c),
-                          "market_cap": int(cap) if cap else None,
-                          "in_watchlist": code in watchlist_codes,
-                      })
-
-                  # 거래량비와 등락률을 함께 반영해 정렬
-                  rows.sort(key=lambda x: (x["volume_ratio"] * 2 + abs(x["change_pct"]) / 5),
-                            reverse=True)
-
-                  out = []
-                  for r in rows:
-                      if len(out) >= SCAN_TOP_N:
-                          break
-                      try:
-                          name = stock.get_market_ticker_name(r["code"])
-                      except Exception:                               # noqa: BLE001
-                          name = None
-                      if _is_excluded_name(name):
-                          continue
-                      r["name"] = name
-                      out.append(r)
-
-                  print(f"국내 전체 스캔: 조건 통과 {len(rows)}종목 → 보고 {len(out)}종목")
-                  return {"date": target, "candidates": out,
-                          "criteria": {
-                              "min_market_cap": SCAN_MIN_MARKET_CAP,
-                              "volume_ratio": SCAN_VOLUME_RATIO,
-                              "change_pct": SCAN_CHANGE_PCT,
-                          }}, None
-
-              except Exception as e:                                  # noqa: BLE001
-                  print(f"국내 전체 스캔 실패: {type(e).__name__}: {e}", file=sys.stderr)
-                  return None, f"{type(e).__name__}: {e}"
+              date = out[0]["date"] if out else (
+                  list(hist.values())[0].index[-1].strftime("%Y-%m-%d"))
+              print(f"국내 유니버스 스캔: 수신 {len(hist)}종목 → 조건 통과 {len(rows)} "
+                    f"→ 보고 {len(out)}종목")
+              return {"date": date, "universe_size": len(symbols),
+                      "received": len(hist), "passed": len(rows), "candidates": out,
+                      "criteria": {"volume_ratio": SCAN_VOLUME_RATIO,
+                                   "change_pct": SCAN_CHANGE_PCT}}, None
 
 
           # ---------------------------------------------------------------- 본체
@@ -570,15 +690,7 @@ jobs:
               # --- 국내 전체 시장 스캔 (관심 종목 밖의 국내 단독 재료)
               # 거래일 목록은 방금 받은 국내 종목 데이터에서 뽑는다.
               # pykrx 지수 조회는 GitHub Actions에서 실패하므로 쓰지 않는다.
-              trading_days = []
-              if kr_frames:
-                  longest = max(kr_frames, key=len)
-                  trading_days = [d.strftime("%Y%m%d") for d in longest.index]
-              print(f"국내 거래일 {len(trading_days)}일 확보 "
-                    f"({trading_days[0] if trading_days else '-'} ~ "
-                    f"{trading_days[-1] if trading_days else '-'})")
-
-              scan, scan_err = scan_kr_market(set(KR_WATCHLIST), trading_days)
+              scan, scan_err = scan_kr_universe(set(KR_WATCHLIST))
               result["kr_market_scan"] = scan
               if scan_err:
                   result["errors"].append(f"국내 전체 스캔: {scan_err}")
