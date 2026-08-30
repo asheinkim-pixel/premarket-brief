@@ -1,10 +1,12 @@
 {
-  "generated_at_kst": "2026-08-30 10:32:35",
+  "generated_at_kst": "2026-08-30 16:48:16",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [],
+  "errors": [
+    "섹터 ETF 수신 실패: XLV"
+  ],
   "sectors": [
     {
       "ticker": "XLC",
@@ -95,21 +97,6 @@
       "volume_ratio": 1.24,
       "close_position_pct": 35.4,
       "change_5d_pct": -0.67
-    },
-    {
-      "ticker": "XLV",
-      "name": "헬스케어",
-      "date": "2026-08-28",
-      "open": 171.43,
-      "high": 171.71,
-      "low": 170.59,
-      "close": 171.16,
-      "change_pct": -0.24,
-      "volume": 4879300,
-      "avg_volume_20d": 8806980,
-      "volume_ratio": 0.55,
-      "close_position_pct": 50.9,
-      "change_5d_pct": -1.98
     },
     {
       "ticker": "XLRE",
