@@ -1,26 +1,13 @@
 {
-  "generated_at_kst": "2026-08-30 10:23:24",
+  "generated_at_kst": "2026-08-30 10:28:39",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [],
+  "errors": [
+    "섹터 ETF 수신 실패: XLC"
+  ],
   "sectors": [
-    {
-      "ticker": "XLC",
-      "name": "커뮤니케이션",
-      "date": "2026-08-28",
-      "open": 111.87,
-      "high": 113.53,
-      "low": 111.83,
-      "close": 112.99,
-      "change_pct": 1.42,
-      "volume": 3743500,
-      "avg_volume_20d": 4373720,
-      "volume_ratio": 0.86,
-      "close_position_pct": 68.2,
-      "change_5d_pct": 1.43
-    },
     {
       "ticker": "XLY",
       "name": "임의소비재",
@@ -173,8 +160,8 @@
     }
   ],
   "us_date": "2026-08-28",
-  "ndx_source": "fallback",
-  "ndx_count": 97,
+  "ndx_source": "slickcharts",
+  "ndx_count": 102,
   "ndx_gainers": [
     {
       "ticker": "WDAY",
@@ -192,21 +179,6 @@
       "change_5d_pct": 2.35
     },
     {
-      "ticker": "LULU",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 116.64,
-      "high": 121.2,
-      "low": 116.35,
-      "close": 120.81,
-      "change_pct": 5.05,
-      "volume": 3910300,
-      "avg_volume_20d": 2746150,
-      "volume_ratio": 1.42,
-      "close_position_pct": 92.0,
-      "change_5d_pct": -0.21
-    },
-    {
       "ticker": "AMZN",
       "name": null,
       "date": "2026-08-28",
@@ -220,21 +192,6 @@
       "volume_ratio": 1.17,
       "close_position_pct": 88.4,
       "change_5d_pct": 3.02
-    },
-    {
-      "ticker": "CHTR",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 149.02,
-      "high": 154.46,
-      "low": 148.64,
-      "close": 153.62,
-      "change_pct": 3.57,
-      "volume": 1697700,
-      "avg_volume_20d": 2618920,
-      "volume_ratio": 0.65,
-      "close_position_pct": 85.6,
-      "change_5d_pct": 2.3
     },
     {
       "ticker": "INTU",
@@ -252,21 +209,6 @@
       "change_5d_pct": -2.44
     },
     {
-      "ticker": "CSGP",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 31.71,
-      "high": 32.59,
-      "low": 31.45,
-      "close": 32.22,
-      "change_pct": 2.81,
-      "volume": 4336700,
-      "avg_volume_20d": 5765165,
-      "volume_ratio": 0.75,
-      "close_position_pct": 67.5,
-      "change_5d_pct": -0.12
-    },
-    {
       "ticker": "ABNB",
       "name": null,
       "date": "2026-08-28",
@@ -280,21 +222,6 @@
       "volume_ratio": 0.88,
       "close_position_pct": 69.8,
       "change_5d_pct": 1.14
-    },
-    {
-      "ticker": "TEAM",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 185.0,
-      "high": 194.96,
-      "low": 185.0,
-      "close": 190.41,
-      "change_pct": 2.58,
-      "volume": 5214600,
-      "avg_volume_20d": 5431590,
-      "volume_ratio": 0.96,
-      "close_position_pct": 54.4,
-      "change_5d_pct": 10.83
     },
     {
       "ticker": "CMCSA",
@@ -419,6 +346,21 @@
       "change_5d_pct": 6.76
     },
     {
+      "ticker": "LITE",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 941.71,
+      "high": 942.91,
+      "low": 893.65,
+      "close": 895.0,
+      "change_pct": -6.39,
+      "volume": 3442100,
+      "avg_volume_20d": 5055380,
+      "volume_ratio": 0.68,
+      "close_position_pct": 2.7,
+      "change_5d_pct": 3.26
+    },
+    {
       "ticker": "ARM",
       "name": null,
       "date": "2026-08-28",
@@ -449,6 +391,21 @@
       "change_5d_pct": -3.85
     },
     {
+      "ticker": "ALAB",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 297.17,
+      "high": 301.04,
+      "low": 287.01,
+      "close": 289.47,
+      "change_pct": -4.81,
+      "volume": 2628600,
+      "avg_volume_20d": 4224940,
+      "volume_ratio": 0.62,
+      "close_position_pct": 17.5,
+      "change_5d_pct": 1.58
+    },
+    {
       "ticker": "SNPS",
       "name": null,
       "date": "2026-08-28",
@@ -462,6 +419,36 @@
       "volume_ratio": 1.21,
       "close_position_pct": 9.2,
       "change_5d_pct": 11.24
+    },
+    {
+      "ticker": "RKLB",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 66.74,
+      "high": 66.75,
+      "low": 63.49,
+      "close": 64.39,
+      "change_pct": -4.65,
+      "volume": 18496000,
+      "avg_volume_20d": 17692405,
+      "volume_ratio": 1.05,
+      "close_position_pct": 27.5,
+      "change_5d_pct": -11.27
+    },
+    {
+      "ticker": "TER",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 368.54,
+      "high": 370.58,
+      "low": 353.25,
+      "close": 354.97,
+      "change_pct": -4.59,
+      "volume": 2388700,
+      "avg_volume_20d": 2705435,
+      "volume_ratio": 0.88,
+      "close_position_pct": 9.9,
+      "change_5d_pct": -5.53
     },
     {
       "ticker": "NVDA",
@@ -509,6 +496,21 @@
       "change_5d_pct": -6.23
     },
     {
+      "ticker": "NBIS",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 211.96,
+      "high": 214.28,
+      "low": 205.48,
+      "close": 209.18,
+      "change_pct": -4.26,
+      "volume": 13088800,
+      "avg_volume_20d": 25363295,
+      "volume_ratio": 0.52,
+      "close_position_pct": 42.0,
+      "change_5d_pct": -4.54
+    },
+    {
       "ticker": "CRWD",
       "name": null,
       "date": "2026-08-28",
@@ -522,6 +524,21 @@
       "volume_ratio": 1.69,
       "close_position_pct": 43.3,
       "change_5d_pct": 13.78
+    },
+    {
+      "ticker": "MPWR",
+      "name": null,
+      "date": "2026-08-28",
+      "open": 1306.03,
+      "high": 1306.03,
+      "low": 1254.01,
+      "close": 1256.26,
+      "change_pct": -4.18,
+      "volume": 706200,
+      "avg_volume_20d": 687080,
+      "volume_ratio": 1.03,
+      "close_position_pct": 4.3,
+      "change_5d_pct": -4.56
     },
     {
       "ticker": "FTNT",
@@ -552,36 +569,6 @@
       "volume_ratio": 1.9,
       "close_position_pct": 54.2,
       "change_5d_pct": 2.69
-    },
-    {
-      "ticker": "SMCI",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 38.02,
-      "high": 38.97,
-      "low": 36.87,
-      "close": 37.08,
-      "change_pct": -3.59,
-      "volume": 29045100,
-      "avg_volume_20d": 55339025,
-      "volume_ratio": 0.52,
-      "close_position_pct": 10.0,
-      "change_5d_pct": -0.43
-    },
-    {
-      "ticker": "GFS",
-      "name": null,
-      "date": "2026-08-28",
-      "open": 46.34,
-      "high": 46.45,
-      "low": 44.53,
-      "close": 44.76,
-      "change_pct": -3.41,
-      "volume": 3307400,
-      "avg_volume_20d": 4468360,
-      "volume_ratio": 0.74,
-      "close_position_pct": 11.9,
-      "change_5d_pct": -6.85
     },
     {
       "ticker": "ADI",
