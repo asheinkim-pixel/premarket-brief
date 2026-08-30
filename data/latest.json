@@ -1,10 +1,12 @@
 {
-  "generated_at_kst": "2026-08-30 16:58:20",
+  "generated_at_kst": "2026-08-30 16:59:27",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [],
+  "errors": [
+    "국내 전체 스캔: KeyError: '지수명'"
+  ],
   "sectors": [
     {
       "ticker": "XLC",
@@ -1240,5 +1242,6 @@
       "code": "007660"
     }
   ],
-  "kr_date": "2026-08-28"
+  "kr_date": "2026-08-28",
+  "kr_market_scan": null
 }
