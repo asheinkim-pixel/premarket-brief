@@ -2,8 +2,13 @@ name: 미장 마감 시세 수집
 
 on:
   schedule:
-    # 22:00 UTC = 07:00 KST (일~목 실행 → 한국 월~금 아침)
-    - cron: "0 22 * * 0-4"
+    # GitHub의 schedule 이벤트는 best-effort라 부하가 높으면 밀린다.
+    # 특히 정각(:00) 슬롯이 가장 붐빈다. 2026-08-31 회차는 140분 지연돼
+    # 09:20 KST(개장 20분 뒤)에야 돌았고, 09-01 회차는 아예 오지 않았다.
+    # → 정각을 피하고 백업 슬롯을 둔다. 같은 날짜 파일을 덮어쓰므로
+    #   두 번 돌아도 안전하다(멱등).
+    - cron: "10 22 * * 0-4"   # 22:10 UTC = 07:10 KST (일~목 UTC → 한국 월~금) 1차
+    - cron: "10 23 * * 0-4"   # 23:10 UTC = 08:10 KST 백업
   workflow_dispatch:
 
 permissions:
@@ -20,7 +25,8 @@ jobs:
         with:
           python-version: "3.12"
 
-      - run: pip install --quiet yfinance pandas lxml
+      # tzdata: zoneinfo가 미국 동부 시간(서머타임 포함)을 계산하는 데 쓴다.
+      - run: pip install --quiet yfinance pandas lxml tzdata
 
       - name: 시세 수집
         run: |
@@ -40,12 +46,29 @@ jobs:
           import sys
           import tempfile
           import time
+          from collections import Counter
           from datetime import datetime, timedelta, timezone
+          from datetime import time as dtime
 
           import pandas as pd
           import yfinance as yf
 
           KST = timezone(timedelta(hours=9))
+
+          # 미국 동부 시간. 서머타임(EDT/EST)이 자동으로 반영돼야 하므로
+          # 고정 오프셋을 쓰지 않는다. tzdata가 없으면 EST(-5)로 후퇴한다.
+          try:
+              from zoneinfo import ZoneInfo
+              US_ET = ZoneInfo("America/New_York")
+          except Exception:                                           # noqa: BLE001
+              US_ET = timezone(timedelta(hours=-5))
+              print("zoneinfo 사용 불가 — 미국 동부시간을 EST 고정으로 처리",
+                    file=sys.stderr)
+
+          # 정규장 종료 + 여유. 이 시각 이전에 찍힌 '오늘' 봉은 미완성으로 본다.
+          KR_OPEN        = dtime(9, 0)
+          KR_CLOSE_GRACE = dtime(15, 40)   # 한국 정규장 15:30 종료
+          US_CLOSE_GRACE = dtime(16, 10)   # 미국 정규장 16:00(ET) 종료
 
           # yfinance는 시간대 정보를 sqlite에 캐시한다. 여러 스레드가 같은 파일을
           # 건드리면 'database is locked'가 나면서 종목이 통째로 누락된다.
@@ -368,6 +391,66 @@ jobs:
               return round((c - l) / (h - l) * 100, 1)
 
 
+          # ------------------------------------------------- 미완성 봉 방어 (핵심)
+          #
+          # 2026-09-01 11:00 KST 수동 실행에서 확인된 사고:
+          #   장중에 돌리자 yfinance가 '진행 중인 오늘 봉'을 돌려줬고, 스크립트는
+          #   그것을 종가로 기록했다. 관심종목 37개 중 28개, 스캔 20개 전부가
+          #   당일 미완성 봉이었다.
+          #
+          #   결과적으로 거래량비 중앙값이 0.23으로 찍혔다. 하루치 평균 거래량과
+          #   2시간치 거래량을 비교했기 때문이다. 브리핑은 거래량비와 종가위치로
+          #   수급을 판정하므로, 이 데이터를 쓰면 "수급이 안 실렸다"는 정반대
+          #   결론이 나온다. 고가·저가도 아직 확정되지 않은 값이다.
+          #
+          # → 세션이 끝나지 않은 당일 봉은 무조건 잘라낸다.
+
+          def drop_incomplete_bar(df, market, now_kst):
+              """진행 중인 당일 봉을 잘라낸다. (잘라낸 DataFrame, 잘랐는지 여부)"""
+              if df is None or len(df) == 0:
+                  return df, False
+
+              if market == "KR":
+                  now_local, grace = now_kst, KR_CLOSE_GRACE
+              else:
+                  now_local, grace = now_kst.astimezone(US_ET), US_CLOSE_GRACE
+
+              try:
+                  last_date = df.index[-1].date()
+              except AttributeError:
+                  return df, False
+
+              if last_date == now_local.date() and now_local.time() < grace:
+                  return df.iloc[:-1], True
+              return df, False
+
+
+          def consensus_date(rows, label, errors):
+              """행들의 기준일 최빈값을 돌려준다. 날짜가 섞여 있으면 errors에 남긴다.
+
+              예전에는 `rows[0]["date"]` 를 썼는데, rows가 등락률 내림차순으로
+              정렬된 뒤라 '등락률 1위 종목 하나의 날짜'였다. 대표값이 아니었고,
+              날짜가 섞여도 이 필드로는 알 수 없었다.
+              """
+              counts = Counter(r["date"] for r in rows if r.get("date"))
+              if not counts:
+                  return None
+              if len(counts) > 1:
+                  errors.append(
+                      f"{label} 기준일 불일치 — 종목마다 날짜가 다릅니다: {dict(counts)}. "
+                      f"이 데이터는 브리핑에 쓰지 마십시오."
+                  )
+              return counts.most_common(1)[0][0]
+
+
+          def prev_business_day(d):
+              """주말만 건너뛴 직전 영업일. 공휴일은 반영하지 못한다."""
+              d -= timedelta(days=1)
+              while d.weekday() >= 5:
+                  d -= timedelta(days=1)
+              return d
+
+
           def fetch_one(ticker, period="3mo"):
               """종목 하나를 개별 조회한다. 실패하면 None."""
               try:
@@ -461,6 +544,20 @@ jobs:
               if len(df) >= 6:
                   row["change_5d_pct"] = pct(c, float(df.iloc[-6]["Close"]))
               return row
+
+
+          def summarize_market(ticker, df, name, market, now_kst, stats):
+              """미완성 당일 봉을 걷어낸 뒤 summarize 한다. 데이터가 모자라면 None.
+
+              봉을 잘라내면 avg_volume_20d와 change_5d_pct의 기준 구간도 함께
+              한 칸씩 밀린다. summarize가 잘린 DataFrame만 보므로 자동으로 맞는다.
+              """
+              df, dropped = drop_incomplete_bar(df, market, now_kst)
+              if dropped:
+                  stats[market] = stats.get(market, 0) + 1
+              if df is None or len(df) < 2:
+                  return None
+              return summarize(ticker, df, name)
 
 
           UA = ("Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 "
@@ -565,7 +662,7 @@ jobs:
               return False
 
 
-          def scan_kr_universe(watchlist_codes):
+          def scan_kr_universe(watchlist_codes, now_kst, stats, errors):
               """코스피 시총 상위 종목에서 거래량 급증 또는 급등 종목을 찾는다.
 
               관심 종목 37개 밖의 국내 단독 재료를 잡기 위한 단계다.
@@ -586,10 +683,26 @@ jobs:
               if not hist:
                   return None, "국내 유니버스 시세 수신 실패"
 
-              rows = []
+              # 먼저 전 종목을 요약한다. 기준일은 걸러내기 전 전체에서 뽑아야
+              # 대표성이 있다. (예전에는 상위 1종목의 날짜를 그대로 썼다.)
+              all_rows = []
               for sym, df in hist.items():
                   code = sym.split(".")[0]
-                  r = summarize(sym, df, KR_UNIVERSE.get(code))
+                  r = summarize_market(sym, df, KR_UNIVERSE.get(code), "KR",
+                                       now_kst, stats)
+                  if r is None:
+                      continue
+                  r["code"] = code
+                  r["in_watchlist"] = False
+                  all_rows.append(r)
+
+              if not all_rows:
+                  return None, "국내 유니버스 요약 실패 (유효한 봉 없음)"
+
+              date = consensus_date(all_rows, "국내 전체 스캔", errors)
+
+              rows = []
+              for r in all_rows:
                   if r["change_pct"] is None or r["volume_ratio"] is None:
                       continue
                   # 선정 기준: 거래량 급증 또는 큰 등락
@@ -597,20 +710,17 @@ jobs:
                       continue
                   if _is_excluded_name(r["name"]):
                       continue
-                  r["code"] = code
-                  r["in_watchlist"] = False
                   rows.append(r)
 
               rows.sort(key=lambda x: x["volume_ratio"] * 2 + abs(x["change_pct"]) / 5,
                         reverse=True)
               out = rows[:SCAN_TOP_N]
 
-              date = out[0]["date"] if out else (
-                  list(hist.values())[0].index[-1].strftime("%Y-%m-%d"))
-              print(f"국내 유니버스 스캔: 수신 {len(hist)}종목 → 조건 통과 {len(rows)} "
-                    f"→ 보고 {len(out)}종목")
+              print(f"국내 유니버스 스캔: 수신 {len(hist)}종목 → 요약 {len(all_rows)} "
+                    f"→ 조건 통과 {len(rows)} → 보고 {len(out)}종목")
               return {"date": date, "universe_size": len(symbols),
-                      "received": len(hist), "passed": len(rows), "candidates": out,
+                      "received": len(hist), "summarized": len(all_rows),
+                      "passed": len(rows), "candidates": out,
                       "criteria": {"volume_ratio": SCAN_VOLUME_RATIO,
                                    "change_pct": SCAN_CHANGE_PCT}}, None
 
@@ -626,6 +736,18 @@ jobs:
                   "thresholds": {"gain": TOP_GAIN_THRESHOLD, "loss": TOP_LOSS_THRESHOLD},
                   "errors": [],
               }
+              errors = result["errors"]
+              stats = {}          # 미완성 봉을 잘라낸 횟수 (시장별)
+
+              # 한국장 개장 중 실행은 개장 전 브리핑 용도로 맞지 않는다.
+              # 당일 봉은 아래에서 걷어내므로 데이터가 오염되지는 않지만,
+              # 그 경우 직전 거래일 종가를 쓰게 되므로 사실을 남겨둔다.
+              if now_kst.weekday() < 5 and KR_OPEN <= now_kst.time() < KR_CLOSE_GRACE:
+                  errors.append(
+                      f"한국장 개장 중 실행됨 ({now_kst:%H:%M} KST). 당일 미완성 봉은 "
+                      f"제외했고 직전 거래일 종가를 담았습니다. 개장 전 브리핑 용도로는 "
+                      f"실행 시각을 확인하십시오."
+                  )
 
               # 시간대 캐시(sqlite)를 단일 스레드로 미리 한 번 채워둔다.
               # 여러 스레드가 빈 캐시에 동시에 쓰려 하면 'database is locked'가 나면서
@@ -638,13 +760,17 @@ jobs:
               sectors = []
               for tkr, kor in SECTOR_ETFS.items():
                   if tkr not in etf_hist:
-                      result["errors"].append(f"섹터 ETF 수신 실패: {tkr}")
+                      errors.append(f"섹터 ETF 수신 실패: {tkr}")
                       continue
-                  row = summarize(tkr, etf_hist[tkr], kor)
+                  row = summarize_market(tkr, etf_hist[tkr], kor, "US", now_kst, stats)
+                  if row is None:
+                      errors.append(f"섹터 ETF 유효 봉 부족: {tkr}")
+                      continue
                   sectors.append(row)
+              # 기준일은 정렬 전에 뽑는다 (정렬 후 [0]은 '가장 많이 오른 종목'이다)
+              result["us_date"] = consensus_date(sectors, "미국 섹터", errors)
               sectors.sort(key=lambda r: r["change_pct"] or -999, reverse=True)
               result["sectors"] = sectors
-              result["us_date"] = sectors[0]["date"] if sectors else None
 
               # --- 나스닥100
               ndx, ndx_source = get_ndx_tickers()
@@ -654,9 +780,19 @@ jobs:
               for tkr in ndx:
                   if tkr not in ndx_hist:
                       continue
-                  ndx_rows.append(summarize(tkr, ndx_hist[tkr]))
+                  row = summarize_market(tkr, ndx_hist[tkr], None, "US", now_kst, stats)
+                  if row is not None:
+                      ndx_rows.append(row)
 
               result["ndx_count"] = len(ndx_rows)
+              # 나스닥100 쪽 날짜도 확인한다. 섹터 ETF와 다르면 수집이 어긋난 것이다.
+              ndx_date = consensus_date(ndx_rows, "나스닥100", errors)
+              result["ndx_date"] = ndx_date
+              if ndx_date and result["us_date"] and ndx_date != result["us_date"]:
+                  errors.append(
+                      f"미국 기준일 불일치 — 섹터 ETF {result['us_date']} / "
+                      f"나스닥100 {ndx_date}"
+                  )
               result["ndx_gainers"] = sorted(
                   [r for r in ndx_rows if (r["change_pct"] or 0) >= TOP_GAIN_THRESHOLD],
                   key=lambda r: r["change_pct"], reverse=True,
@@ -673,27 +809,61 @@ jobs:
 
               # --- 국내 관심 종목
               kr_rows = []
-              kr_frames = []
               for code, name in KR_WATCHLIST.items():
                   sym, df = resolve_kr(code)
                   if df is None:
-                      result["errors"].append(f"국내 종목 수신 실패: {name}({code})")
+                      errors.append(f"국내 종목 수신 실패: {name}({code})")
                       continue
-                  kr_frames.append(df)
-                  row = summarize(sym, df, name)
+                  row = summarize_market(sym, df, name, "KR", now_kst, stats)
+                  if row is None:
+                      errors.append(f"국내 종목 유효 봉 부족: {name}({code})")
+                      continue
                   row["code"] = code
                   kr_rows.append(row)
+              # 기준일은 정렬 전에 뽑는다 (정렬 후 [0]은 '가장 많이 오른 종목'이다)
+              result["kr_date"] = consensus_date(kr_rows, "국내 관심종목", errors)
               kr_rows.sort(key=lambda r: r["change_pct"] or -999, reverse=True)
               result["kr_watchlist"] = kr_rows
-              result["kr_date"] = kr_rows[0]["date"] if kr_rows else None
 
               # --- 국내 전체 시장 스캔 (관심 종목 밖의 국내 단독 재료)
               # 거래일 목록은 방금 받은 국내 종목 데이터에서 뽑는다.
               # pykrx 지수 조회는 GitHub Actions에서 실패하므로 쓰지 않는다.
-              scan, scan_err = scan_kr_universe(set(KR_WATCHLIST))
+              scan, scan_err = scan_kr_universe(set(KR_WATCHLIST), now_kst,
+                                                stats, errors)
               result["kr_market_scan"] = scan
               if scan_err:
-                  result["errors"].append(f"국내 전체 스캔: {scan_err}")
+                  errors.append(f"국내 전체 스캔: {scan_err}")
+              if scan and result["kr_date"] and scan["date"] != result["kr_date"]:
+                  errors.append(
+                      f"국내 기준일 불일치 — 관심종목 {result['kr_date']} / "
+                      f"전체 스캔 {scan['date']}"
+                  )
+
+              # --- 신선도 점검
+              # errors가 비어 있어도 데이터가 낡을 수 있다는 것이 2026-09-01에
+              # 확인됐다. 수집기 스스로 날짜를 대조해 남긴다.
+              expected = prev_business_day(now_kst.date()).isoformat()
+              result["freshness"] = {
+                  "run_kst": now_kst.strftime("%Y-%m-%d %H:%M:%S"),
+                  "expected_prev_business_day": expected,
+                  "us_date": result.get("us_date"),
+                  "kr_date": result.get("kr_date"),
+                  "incomplete_bars_dropped": dict(stats),
+              }
+              for label, key in (("미국", "us_date"), ("국내", "kr_date")):
+                  got = result.get(key)
+                  if got and got < expected:
+                      errors.append(
+                          f"{label} 기준일이 예상보다 이릅니다 (기준일 {got}, "
+                          f"직전 영업일 {expected}). 공휴일이면 정상일 수 있으니 "
+                          f"확인이 필요합니다."
+                      )
+                  if got and got > expected:
+                      errors.append(
+                          f"{label} 기준일이 직전 영업일보다 나중입니다 "
+                          f"(기준일 {got}, 직전 영업일 {expected}). 진행 중인 봉이 "
+                          f"섞였을 수 있습니다."
+                      )
 
               # --- 저장
               os.makedirs("data", exist_ok=True)
@@ -702,12 +872,17 @@ jobs:
                   with open(path, "w", encoding="utf-8") as f:
                       json.dump(result, f, ensure_ascii=False, indent=2)
 
-              print(f"미국 기준일: {result['us_date']} / 한국 기준일: {result['kr_date']}")
+              print(f"미국 기준일: {result['us_date']} / 한국 기준일: {result['kr_date']}"
+                    f" / 직전 영업일(주말만 반영): {expected}")
               print(f"나스닥100 수신 {result['ndx_count']}종목 "
                     f"(강세 {len(result['ndx_gainers'])} / 약세 {len(result['ndx_losers'])})")
               print(f"국내 수신 {len(kr_rows)}종목")
-              if result["errors"]:
-                  print("경고:", *result["errors"], sep="\n  ")
+              if stats:
+                  print(f"미완성 당일 봉 제외: {stats}")
+              if errors:
+                  print("경고:", *errors, sep="\n  ")
+              else:
+                  print("경고 없음")
 
 
           if __name__ == "__main__":
