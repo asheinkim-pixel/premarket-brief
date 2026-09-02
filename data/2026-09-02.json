@@ -1,10 +1,12 @@
 {
-  "generated_at_kst": "2026-09-02 08:35:43",
+  "generated_at_kst": "2026-09-02 09:17:44",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [],
+  "errors": [
+    "한국장 개장 중 실행됨 (09:17 KST). 당일 미완성 봉은 제외했고 직전 거래일 종가를 담았습니다. 개장 전 브리핑 용도로는 실행 시각을 확인하십시오."
+  ],
   "us_date": "2026-09-01",
   "sectors": [
     {
@@ -264,10 +266,10 @@
       "close": 518.3,
       "change_pct": -8.52,
       "volume": 1416130,
-      "avg_volume_20d": 910770,
-      "volume_ratio": 1.55,
+      "avg_volume_20d": 939715,
+      "volume_ratio": 1.51,
       "close_position_pct": 14.9,
-      "change_5d_pct": -15.48
+      "change_5d_pct": -13.27
     },
     {
       "ticker": "CDNS",
@@ -384,10 +386,10 @@
       "close": 161.85,
       "change_pct": -5.31,
       "volume": 5359864,
-      "avg_volume_20d": 4553875,
-      "volume_ratio": 1.18,
+      "avg_volume_20d": 4594970,
+      "volume_ratio": 1.17,
       "close_position_pct": 13.4,
-      "change_5d_pct": 5.33
+      "change_5d_pct": 6.49
     },
     {
       "ticker": "PANW",
@@ -429,10 +431,10 @@
       "close": 868.95,
       "change_pct": -5.01,
       "volume": 3817822,
-      "avg_volume_20d": 4950370,
+      "avg_volume_20d": 4988185,
       "volume_ratio": 0.77,
       "close_position_pct": 26.9,
-      "change_5d_pct": -1.88
+      "change_5d_pct": 4.67
     },
     {
       "ticker": "ADSK",
@@ -519,10 +521,10 @@
       "close": 48.7,
       "change_pct": -3.58,
       "volume": 15630971,
-      "avg_volume_20d": 9210360,
-      "volume_ratio": 1.7,
+      "avg_volume_20d": 9515390,
+      "volume_ratio": 1.64,
       "close_position_pct": 33.0,
-      "change_5d_pct": -5.46
+      "change_5d_pct": -5.33
     },
     {
       "ticker": "CRWV",
@@ -1550,7 +1552,7 @@
     }
   },
   "freshness": {
-    "run_kst": "2026-09-02 08:35:43",
+    "run_kst": "2026-09-02 09:17:44",
     "expected_prev_business_day": "2026-09-01",
     "us_date": "2026-09-01",
     "kr_date": "2026-09-01",
