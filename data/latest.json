@@ -1,5 +1,5 @@
 {
-  "generated_at_kst": "2026-10-16 08:47:28",
+  "generated_at_kst": "2026-10-16 08:56:23",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
@@ -272,14 +272,14 @@
       "name": null,
       "date": "2026-10-15",
       "open": 85.48,
-      "high": 87.85,
+      "high": 87.88,
       "low": 85.43,
       "close": 87.71,
       "change_pct": 5.08,
       "volume": 4521424,
       "avg_volume_20d": 3896140,
       "volume_ratio": 1.16,
-      "close_position_pct": 94.2,
+      "close_position_pct": 93.1,
       "change_5d_pct": 3.91
     },
     {
@@ -302,14 +302,14 @@
       "name": null,
       "date": "2026-10-15",
       "open": 219.8,
-      "high": 231.89,
+      "high": 231.81,
       "low": 218.74,
       "close": 231.09,
       "change_pct": 4.65,
       "volume": 5170267,
       "avg_volume_20d": 3308110,
       "volume_ratio": 1.56,
-      "close_position_pct": 93.9,
+      "close_position_pct": 94.5,
       "change_5d_pct": 0.01
     },
     {
@@ -392,14 +392,14 @@
       "name": null,
       "date": "2026-10-15",
       "open": 190.38,
-      "high": 200.19,
+      "high": 200.07,
       "low": 190.38,
       "close": 196.63,
       "change_pct": 4.16,
       "volume": 3215832,
       "avg_volume_20d": 2362445,
       "volume_ratio": 1.36,
-      "close_position_pct": 63.7,
+      "close_position_pct": 64.5,
       "change_5d_pct": 4.7
     },
     {
@@ -632,14 +632,14 @@
       "name": null,
       "date": "2026-10-15",
       "open": 156.39,
-      "high": 160.51,
+      "high": 160.49,
       "low": 156.04,
       "close": 157.37,
       "change_pct": 2.49,
       "volume": 8278157,
       "avg_volume_20d": 5952395,
       "volume_ratio": 1.39,
-      "close_position_pct": 29.8,
+      "close_position_pct": 29.9,
       "change_5d_pct": 6.98
     },
     {
@@ -1911,7 +1911,7 @@
     }
   },
   "freshness": {
-    "run_kst": "2026-10-16 08:47:28",
+    "run_kst": "2026-10-16 08:56:23",
     "expected_prev_business_day": "2026-10-15",
     "us_date": "2026-10-15",
     "kr_date": "2026-10-15",
