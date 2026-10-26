@@ -1,10 +1,12 @@
 {
-  "generated_at_kst": "2026-10-26 08:37:16",
+  "generated_at_kst": "2026-10-26 09:25:03",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
   },
-  "errors": [],
+  "errors": [
+    "한국장 개장 중 실행됨 (09:25 KST). 당일 미완성 봉은 제외했고 직전 거래일 종가를 담았습니다. 개장 전 브리핑 용도로는 실행 시각을 확인하십시오."
+  ],
   "us_date": "2026-10-23",
   "sectors": [
     {
@@ -1336,10 +1338,12 @@
     }
   },
   "freshness": {
-    "run_kst": "2026-10-26 08:37:16",
+    "run_kst": "2026-10-26 09:25:03",
     "expected_prev_business_day": "2026-10-23",
     "us_date": "2026-10-23",
     "kr_date": "2026-10-23",
-    "incomplete_bars_dropped": {}
+    "incomplete_bars_dropped": {
+      "KR": 235
+    }
   }
 }
