@@ -1,5 +1,5 @@
 {
-  "generated_at_kst": "2026-11-01 06:50:38",
+  "generated_at_kst": "2026-11-02 06:50:35",
   "thresholds": {
     "gain": 2.0,
     "loss": -3.0
@@ -2196,7 +2196,7 @@
     }
   },
   "freshness": {
-    "run_kst": "2026-11-01 06:50:38",
+    "run_kst": "2026-11-02 06:50:35",
     "expected_prev_business_day": "2026-10-30",
     "us_date": "2026-10-30",
     "kr_date": "2026-10-30",
